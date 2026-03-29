@@ -39,3 +39,34 @@ body {
     font-weight: bold;
     color: #00ff00;
 }
+
+/* Mobile controls styling */
+#mobileControls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+#mobileControls button {
+    font-size: 2em;
+    padding: 15px;
+    border-radius: 10px;
+    border: none;
+    background-color: #222;
+    color: #fff;
+    box-shadow: 0 0 10px #00ff00;
+    user-select: none;
+}
+
+#mobileControls button:active {
+    background-color: #555;
+}
+
+/* Hide mobile controls by default, show only on small screens */
+.hidden { display: none; }
+
+@media (max-width: 600px) {
+    #mobileControls { display: flex; }
+    #gameContainer { flex-direction: column; align-items: center; }
+}
