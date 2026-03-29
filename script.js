@@ -18,7 +18,7 @@ const SHAPES = {
     Z: [[7,7,0],[0,7,7],[0,0,0]]
 };
 
-// Colors for blocks
+// Colors
 const COLORS = [
     null,
     '#0DC2FF', // I
@@ -34,10 +34,15 @@ const COLORS = [
 let board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
 let score = 0, level = 1, linesCleared = 0;
 let dropCounter = 0;
-let dropInterval = 300; // fast start
+let dropInterval = 250; // faster start
 let lastTime = 0;
-let isTouching = false; // for mobile hold
-let mobileSpeedMultiplier = 3;
+
+// Mobile swipe tracking
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartTime = 0;
+let isTouching = false;
+const mobileSpeedMultiplier = 5;
 
 // Player
 const player = {
@@ -45,11 +50,8 @@ const player = {
     matrix: createPiece(randomShape())
 };
 
-function createPiece(type){
-    return SHAPES[type];
-}
-
-function randomShape(){
+function createPiece(type){ return SHAPES[type]; }
+function randomShape(){ 
     const keys = Object.keys(SHAPES);
     return keys[Math.floor(Math.random()*keys.length)];
 }
@@ -65,13 +67,11 @@ function drawBlock(x,y,value){
     }
 }
 
-// Draw the board and current piece
+// Draw everything
 function draw(){
     ctx.clearRect(0,0,COLS,ROWS);
     board.forEach((row,y)=>{
-        row.forEach((value,x)=>{
-            drawBlock(x,y,value);
-        });
+        row.forEach((value,x)=> drawBlock(x,y,value));
     });
     player.matrix.forEach((row,y)=>{
         row.forEach((value,x)=>{
@@ -80,7 +80,7 @@ function draw(){
     });
 }
 
-// Merge piece into board
+// Merge piece
 function merge(){
     player.matrix.forEach((row,y)=>{
         row.forEach((value,x)=>{
@@ -89,63 +89,54 @@ function merge(){
     });
 }
 
-// Check collision
+// Collision
 function collide(){
     const m = player.matrix;
     const o = player.pos;
     for(let y=0;y<m.length;y++){
         for(let x=0;x<m[y].length;x++){
-            if(m[y][x] && (board[y+o.y] && board[y+o.y][x+o.x])!==0){
-                return true;
-            }
+            if(m[y][x] && (board[y+o.y] && board[y+o.y][x+o.x])!==0) return true;
         }
     }
     return false;
 }
 
-// Clear completed rows
+// Sweep rows with animation
 function sweep(){
     let rowCount = 0;
-    outer: for(let y=board.length-1; y>=0; y--){
-        for(let x=0; x<COLS; x++){
-            if(board[y][x] === 0) continue outer;
-        }
+    outer: for(let y=board.length-1;y>=0;y--){
+        for(let x=0;x<COLS;x++) if(board[y][x]===0) continue outer;
         rowCount++;
-        // flash animation
         for(let i=0;i<6;i++){
-            setTimeout(()=>{
-                board[y].forEach((_,x)=>board[y][x] = i%2 ? 0 : 8);
-            }, i*50);
+            setTimeout(()=> board[y].forEach((_,x)=>board[y][x]=i%2?0:8), i*50);
         }
         const row = board.splice(y,1)[0].fill(0);
         board.unshift(row);
         y++;
     }
     if(rowCount){
-        score += rowCount * 100;
+        score += rowCount*100;
         linesCleared += rowCount;
         if(linesCleared % 10 === 0) level++;
-        dropInterval = Math.max(50, 300 - (level-1)*30);
+        dropInterval = Math.max(50, 250 - (level-1)*20);
         document.getElementById('score').textContent = score;
         document.getElementById('level').textContent = level;
         document.getElementById('lines').textContent = linesCleared;
     }
 }
 
-// Rotate piece
+// Rotate
 function rotate(dir){
     const m = player.matrix;
     for(let y=0;y<m.length;y++){
-        for(let x=0;x<y;x++){
-            [m[x][y], m[y][x]] = [m[y][x], m[x][y]];
-        }
+        for(let x=0;x<y;x++) [m[x][y], m[y][x]] = [m[y][x], m[x][y]];
     }
     if(dir>0) m.forEach(row=>row.reverse());
     else m.reverse();
 }
 
 // Drop piece
-function playerDrop(speedMultiplier = 1){
+function playerDrop(speedMultiplier=1){
     for(let i=0;i<speedMultiplier;i++){
         player.pos.y++;
         if(collide()){
@@ -167,7 +158,7 @@ function resetPlayer(){
     if(collide()){
         board.forEach(row=>row.fill(0));
         score=0; level=1; linesCleared=0;
-        dropInterval=300;
+        dropInterval=250;
         document.getElementById('score').textContent = score;
         document.getElementById('level').textContent = level;
         document.getElementById('lines').textContent = linesCleared;
@@ -187,16 +178,14 @@ function update(time=0){
     lastTime = time;
     dropCounter += deltaTime;
 
-    // mobile fast drop
     const speed = isTouching ? mobileSpeedMultiplier : 1;
-
-    if(dropCounter > dropInterval/speed) playerDrop(speed);
+    if(dropCounter > dropInterval / speed) playerDrop(speed);
 
     draw();
     requestAnimationFrame(update);
 }
 
-// Keyboard controls for desktop
+// Desktop keyboard controls
 document.addEventListener('keydown', e=>{
     if(e.key==='ArrowLeft') playerMove(-1);
     if(e.key==='ArrowRight') playerMove(1);
@@ -207,13 +196,37 @@ document.addEventListener('keydown', e=>{
 // Mobile touch controls
 canvas.addEventListener('touchstart', e=>{
     e.preventDefault();
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchStartTime = Date.now();
     isTouching = true;
-    rotate(1); // tap = rotate
+});
+
+canvas.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+
+    if(Math.abs(dx) > BLOCK_SIZE){ // swipe horizontally
+        if(dx > 0) playerMove(1);
+        else playerMove(-1);
+        touchStartX = touch.clientX; // reset for next move
+    }
+    if(dy > BLOCK_SIZE){ // swipe down
+        playerDrop(1);
+        touchStartY = touch.clientY;
+    }
 });
 
 canvas.addEventListener('touchend', e=>{
     e.preventDefault();
-    isTouching = false; // release = normal speed
+    const touchDuration = Date.now() - touchStartTime;
+    if(touchDuration < 200){ // short tap = rotate
+        rotate(1);
+    }
+    isTouching = false;
 });
 
 // Start game
