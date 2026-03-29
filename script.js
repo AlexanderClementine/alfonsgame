@@ -21,28 +21,20 @@ const SHAPES = {
 // Colors
 const COLORS = [
     null,
-    '#0DC2FF', // I
-    '#3877FF', // J
-    '#FF8E0D', // L
-    '#FFE138', // O
-    '#0DFF72', // S
-    '#FF0D72', // T
-    '#F538FF'  // Z
+    '#0DC2FF', '#3877FF', '#FF8E0D', '#FFE138', '#0DFF72', '#FF0D72', '#F538FF'
 ];
 
 // Game state
 let board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
 let score = 0, level = 1, linesCleared = 0;
 let dropCounter = 0;
-let dropInterval = 250; // faster start
+let dropInterval = 250;
 let lastTime = 0;
 
-// Mobile swipe tracking
+// Touch tracking
 let touchStartX = 0;
 let touchStartY = 0;
 let touchStartTime = 0;
-let isTouching = false;
-const mobileSpeedMultiplier = 5;
 
 // Player
 const player = {
@@ -67,26 +59,20 @@ function drawBlock(x,y,value){
     }
 }
 
-// Draw everything
+// Draw board and piece
 function draw(){
     ctx.clearRect(0,0,COLS,ROWS);
-    board.forEach((row,y)=>{
-        row.forEach((value,x)=> drawBlock(x,y,value));
-    });
-    player.matrix.forEach((row,y)=>{
-        row.forEach((value,x)=>{
-            if(value) drawBlock(x + player.pos.x, y + player.pos.y, value);
-        });
-    });
+    board.forEach((row,y)=>row.forEach((value,x)=>drawBlock(x,y,value)));
+    player.matrix.forEach((row,y)=>row.forEach((value,x)=>{
+        if(value) drawBlock(x+player.pos.x, y+player.pos.y, value);
+    }));
 }
 
 // Merge piece
 function merge(){
-    player.matrix.forEach((row,y)=>{
-        row.forEach((value,x)=>{
-            if(value) board[y + player.pos.y][x + player.pos.x] = value;
-        });
-    });
+    player.matrix.forEach((row,y)=>row.forEach((value,x)=>{
+        if(value) board[y+player.pos.y][x+player.pos.x]=value;
+    }));
 }
 
 // Collision
@@ -101,14 +87,14 @@ function collide(){
     return false;
 }
 
-// Sweep rows with animation
+// Clear rows
 function sweep(){
     let rowCount = 0;
     outer: for(let y=board.length-1;y>=0;y--){
         for(let x=0;x<COLS;x++) if(board[y][x]===0) continue outer;
         rowCount++;
         for(let i=0;i<6;i++){
-            setTimeout(()=> board[y].forEach((_,x)=>board[y][x]=i%2?0:8), i*50);
+            setTimeout(()=>board[y].forEach((_,x)=>board[y][x]=i%2?0:8), i*50);
         }
         const row = board.splice(y,1)[0].fill(0);
         board.unshift(row);
@@ -117,15 +103,15 @@ function sweep(){
     if(rowCount){
         score += rowCount*100;
         linesCleared += rowCount;
-        if(linesCleared % 10 === 0) level++;
-        dropInterval = Math.max(50, 250 - (level-1)*20);
+        if(linesCleared%10===0) level++;
+        dropInterval = Math.max(50, 250-(level-1)*20);
         document.getElementById('score').textContent = score;
         document.getElementById('level').textContent = level;
         document.getElementById('lines').textContent = linesCleared;
     }
 }
 
-// Rotate
+// Rotate piece
 function rotate(dir){
     const m = player.matrix;
     for(let y=0;y<m.length;y++){
@@ -135,57 +121,53 @@ function rotate(dir){
     else m.reverse();
 }
 
-// Drop piece
-function playerDrop(speedMultiplier=1){
-    for(let i=0;i<speedMultiplier;i++){
-        player.pos.y++;
-        if(collide()){
-            player.pos.y--;
-            merge();
-            resetPlayer();
-            sweep();
-            break;
-        }
+// Drop piece by one
+function playerDrop(){
+    player.pos.y++;
+    if(collide()){
+        player.pos.y--;
+        merge();
+        resetPlayer();
+        sweep();
     }
     dropCounter=0;
 }
 
 // Reset player
 function resetPlayer(){
-    player.matrix = createPiece(randomShape());
-    player.pos.y = 0;
-    player.pos.x = Math.floor(COLS/2) - Math.floor(player.matrix[0].length/2);
+    player.matrix=createPiece(randomShape());
+    player.pos.y=0;
+    player.pos.x=Math.floor(COLS/2)-Math.floor(player.matrix[0].length/2);
     if(collide()){
         board.forEach(row=>row.fill(0));
         score=0; level=1; linesCleared=0;
         dropInterval=250;
-        document.getElementById('score').textContent = score;
-        document.getElementById('level').textContent = level;
-        document.getElementById('lines').textContent = linesCleared;
+        document.getElementById('score').textContent=score;
+        document.getElementById('level').textContent=level;
+        document.getElementById('lines').textContent=linesCleared;
         alert("Game Over! Alfons resets the board.");
     }
 }
 
-// Move piece
+// Move piece horizontally
 function playerMove(dir){
-    player.pos.x += dir;
-    if(collide()) player.pos.x -= dir;
+    player.pos.x+=dir;
+    if(collide()) player.pos.x-=dir;
 }
 
 // Game loop
 function update(time=0){
-    const deltaTime = time - lastTime;
-    lastTime = time;
-    dropCounter += deltaTime;
+    const deltaTime = time-lastTime;
+    lastTime=time;
+    dropCounter+=deltaTime;
 
-    const speed = isTouching ? mobileSpeedMultiplier : 1;
-    if(dropCounter > dropInterval / speed) playerDrop(speed);
+    if(dropCounter>dropInterval) playerDrop();
 
     draw();
     requestAnimationFrame(update);
 }
 
-// Desktop keyboard controls
+// Desktop keyboard
 document.addEventListener('keydown', e=>{
     if(e.key==='ArrowLeft') playerMove(-1);
     if(e.key==='ArrowRight') playerMove(1);
@@ -200,7 +182,6 @@ canvas.addEventListener('touchstart', e=>{
     touchStartX = touch.clientX;
     touchStartY = touch.clientY;
     touchStartTime = Date.now();
-    isTouching = true;
 });
 
 canvas.addEventListener('touchmove', e=>{
@@ -209,25 +190,22 @@ canvas.addEventListener('touchmove', e=>{
     const dx = touch.clientX - touchStartX;
     const dy = touch.clientY - touchStartY;
 
-    if(Math.abs(dx) > BLOCK_SIZE){ // swipe horizontally
-        if(dx > 0) playerMove(1);
+    if(Math.abs(dx)>BLOCK_SIZE){
+        if(dx>0) playerMove(1);
         else playerMove(-1);
-        touchStartX = touch.clientX; // reset for next move
+        touchStartX = touch.clientX;
     }
-    if(dy > BLOCK_SIZE){ // swipe down
-        playerDrop(1);
+    if(dy>BLOCK_SIZE){
+        playerDrop();
         touchStartY = touch.clientY;
     }
 });
 
 canvas.addEventListener('touchend', e=>{
     e.preventDefault();
-    const touchDuration = Date.now() - touchStartTime;
-    if(touchDuration < 200){ // short tap = rotate
-        rotate(1);
-    }
-    isTouching = false;
+    const touchDuration = Date.now()-touchStartTime;
+    if(touchDuration<200) rotate(1); // tap rotates
 });
 
-// Start game
+// Start
 update();
